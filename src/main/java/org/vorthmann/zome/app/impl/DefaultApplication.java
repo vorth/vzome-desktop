@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.vecmath.Vector3f;
@@ -268,7 +269,8 @@ public class DefaultApplication extends DefaultController implements Application
         }
 
         long endtime = System.currentTimeMillis();
-        logger.fine( "DefaultApplication .initialize() in milliseconds: " + ( endtime - starttime ) );
+        if ( logger .isLoggable( Level .FINE ) )
+        	logger.fine( "DefaultApplication .initialize() in milliseconds: " + ( endtime - starttime ) );
         
 //         String teaPort = props .getProperty( "tea.agent.port" );
 //         if ( teaPort != null )

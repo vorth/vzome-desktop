@@ -647,7 +647,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener
                 String url = JOptionPane.showInputDialog( null, "Enter the URL for an online .vZome file.", "Open URL",
                         JOptionPane.PLAIN_MESSAGE );
                 try {
-                    mController .doAction( "openURL", new ActionEvent( DocumentFrame.this, ActionEvent.ACTION_PERFORMED, url ) );
+                    mController .actionPerformed( new ActionEvent( DocumentFrame.this, ActionEvent.ACTION_PERFORMED, "openURL-" + url ) );
                 } catch ( Exception ex )
                 {
                     ex .printStackTrace();
@@ -793,7 +793,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener
                     String number = JOptionPane.showInputDialog( null, "Enter the edit number.", "Set Edit Number",
                             JOptionPane.PLAIN_MESSAGE );
                     try {
-                        mController .doAction( "redoUntilEdit." + number, new ActionEvent( DocumentFrame.this, ActionEvent.ACTION_PERFORMED, "redoUntilEdit." + number ) );
+                        mController .actionPerformed( new ActionEvent( DocumentFrame.this, ActionEvent.ACTION_PERFORMED, "redoUntilEdit." + number ) );
                     } catch ( Exception e1 ) {
                         errors .reportError( Controller.USER_ERROR_CODE, new Object[]{ e1 } );
                     }
@@ -868,6 +868,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener
         menu.addSeparator();
 //        menu.add( createEditorMenuItem( "Affine Transform All", getExclusiveAction( "affineTransformAll" ) ) );
         menuItem = createPowerMenuItem( "Conjugate", getExclusiveAction( "conjugate" ) );
+        menuItem = createEditorMenuItem( "Meta-model", getExclusiveAction( "realizeMetaParts" ) );
         menu .add(  menuItem );
         if ( isGolden ) {
             menu.add( createEditorMenuItem( "\u03C4 Divide", getExclusiveAction( "tauDivide" ) ) );
@@ -1306,7 +1307,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener
         {
             protected void doAction( ActionEvent e ) throws Exception
             {
-                mController.doAction( action, e );
+                mController.actionPerformed( e );
             }
 
             protected void showError( Exception e )

@@ -10,6 +10,8 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.File;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.vorthmann.j3d.MouseTool;
 
@@ -19,8 +21,10 @@ public class DefaultController implements Controller
     
     protected ErrorChannel mErrors;
     
-    protected Controller mNextController;
+    protected DefaultController mNextController;
     
+    static final Logger logger = Logger.getLogger( "org.vorthmann.zome.controller" );
+
     protected PropertyChangeSupport properties()
     {
         return this.pcs;
@@ -29,6 +33,8 @@ public class DefaultController implements Controller
     public void actionPerformed( ActionEvent e )
     {
         try {
+            if ( logger .isLoggable( Level .INFO ) )
+            	logger.info( "actionPerformed: " + e .getActionCommand() );
             // TODO inline this
             doAction( e .getActionCommand(), e );
         } catch ( Exception ex )
@@ -129,7 +135,7 @@ public class DefaultController implements Controller
 
     public void setNextController( Controller controller )
     {
-        mNextController = controller;
+        mNextController = (DefaultController) controller;
         controller .addPropertyListener( new PropertyChangeListener()
         {
             // multicast prop changes down the tree of controllers... watch out for loops!

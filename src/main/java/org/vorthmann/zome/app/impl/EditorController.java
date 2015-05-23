@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.media.jai.JAI;
 import javax.vecmath.Point3d;
@@ -165,6 +167,8 @@ public class EditorController extends DefaultController implements J3dComponentF
 
     private int changeCount = 0;
     
+    static final Logger logger = Logger.getLogger( "org.vorthmann.zome.controller" );
+
    /*
      * See the javadoc to control the logging:
      * 
@@ -558,12 +562,19 @@ public class EditorController extends DefaultController implements J3dComponentF
                         shift = shiftKey;
                     if ( target == null )
                         try {
+                            if ( logger .isLoggable( Level .INFO ) )
+                            	logger.info( "deselectAll" );
+                            
                             document .performAndRecord( document .deselectAll() );
                         } catch ( Exception e ) {
                             mErrors .reportError( UNKNOWN_ERROR_CODE, new Object[] { e } );
                         }
-                    else
+                    else {
+                        if ( logger .isLoggable( Level .INFO ) )
+                        	logger.info( "select " + target .getLocation() );
+                        
                         document .performAndRecord( document .selectManifestation( target, ! shift ) );
+                    }
                 }
             } );
             if ( editingModel )
@@ -591,8 +602,12 @@ public class EditorController extends DefaultController implements J3dComponentF
 				protected void dragFinished( Manifestation target, boolean b )
                 {
                     UndoableEdit buildStrut = previewStrut .finishPreview( document );
-                    if ( buildStrut != null )
+                    if ( buildStrut != null ) {
+                        if ( logger .isLoggable( Level .INFO ) )
+                        	logger.info( "build strut " + buildStrut );
+                        
                         document .performAndRecord( buildStrut );
+                    }
                 }
             } );
             if ( editingModel )
@@ -696,6 +711,10 @@ public class EditorController extends DefaultController implements J3dComponentF
 
     public void doAction( String action, ActionEvent e ) throws Failure
     {
+
+        if ( logger .isLoggable( Level .INFO ) )
+        	logger.info( "doAction: " + action );
+        
         if ( "finish.load".equals( action ) ) {
 
             boolean openUndone = propertyIsTrue( "open.undone" );

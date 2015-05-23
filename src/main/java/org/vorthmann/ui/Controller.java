@@ -41,7 +41,7 @@ public interface Controller extends ActionListener
 
     void actionPerformed( ActionEvent e );
 
-    void doAction( String action, ActionEvent e ) throws Exception;
+//    void doAction( String action, ActionEvent e ) throws Exception;
 
     boolean[] getCommandListDefaultStates( String string );
 
