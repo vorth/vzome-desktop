@@ -101,8 +101,6 @@ public class DocumentController extends DefaultController implements J3dComponen
     private final RenderedModel mRenderedModel;
 
     private RenderedModel currentSnapshot;
-
-    private CameraController mViewPlatform;
     
     private Lights sceneLighting;
     
@@ -116,11 +114,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 
     private final ApplicationController mApp;
 
-    private Java2dSnapshot mSnapshot = null;
-
     private boolean mRequireShift = false, showFrameLabels = false, useWorkingPlane = false;
-
-    private LessonController lessonController;
 
     private final boolean startReader;
     
@@ -129,20 +123,16 @@ public class DocumentController extends DefaultController implements J3dComponen
     private PropertyChangeListener articleChanges, modelChanges;
 
     private final Properties properties;
-        
-    private SymmetryController symmetryController;
     
     private Segment workingPlaneAxis = null;
-    
-    private final ToolsController toolsController;
-    
-    private PartsController partsController;
 
     private Map<String,SymmetryController> symmetries = new HashMap<>();
 
     private String designClipboard;
 
     private boolean editingModel;
+
+    private int changeCount = 0;
 
     private Camera currentView;
 
@@ -151,13 +141,27 @@ public class DocumentController extends DefaultController implements J3dComponen
     private final Component modelCanvas, leftEyeCanvas, rightEyeCanvas;
 
     private MouseTool selectionClick, previewStrutStart, previewStrutRoll, previewStrutPlanarDrag;
+    
+    /* subcontrollers */
+    
+    private final UndoRedoController undoRedoController;
+
+    private final LessonController lessonController;
+
+    private final CameraController cameraController;
+
+    private final ToolsController toolsController;
+    
+    private final PartsController partsController;
 
     private final Controller polytopesController;
 
-    private int changeCount = 0;
-
 	private final PickingController monoController, leftController, rightController;
-	    
+    
+	private SymmetryController symmetryController;
+
+    private Java2dSnapshot mSnapshot = null;
+
    /*
      * See the javadoc to control the logging:
      * 
@@ -192,6 +196,9 @@ public class DocumentController extends DefaultController implements J3dComponen
         
         polytopesController = new PolytopesController( this .documentModel );
         polytopesController .setNextController( this );
+        
+        undoRedoController = new UndoRedoController( document ); // TODO undoRedo model
+        undoRedoController .setNextController( this );
         
         mRenderedModel = new RenderedModel( this .documentModel .getField(), true );
         currentSnapshot = mRenderedModel;
@@ -232,8 +239,8 @@ public class DocumentController extends DefaultController implements J3dComponen
         		else if ( "currentView" .equals( change .getPropertyName() ) )
         		{
         			Camera newView = (Camera) change .getNewValue();
-        			if ( ! newView .equals( mViewPlatform .getView() ) )
-        				mViewPlatform .restoreView( newView );
+        			if ( ! newView .equals( cameraController .getView() ) )
+        				cameraController .restoreView( newView );
         		}
         		else if ( "thumbnailChanged" .equals( change .getPropertyName() ) )
         		{
@@ -261,26 +268,26 @@ public class DocumentController extends DefaultController implements J3dComponen
 
         // this seems backwards, I know... the TrackballViewPlatformModel is the main
         // model, and only forwards two events to trackballVPM
-        mViewPlatform = new CameraController( document .getViewModel() );
-        mViewPlatform .setNextController( this );
+        cameraController = new CameraController( document .getViewModel() );
+        cameraController .setNextController( this );
 
         RenderingViewer.Factory rvFactory = app .getJ3dFactory();
         mainScene = rvFactory .createRenderingChanges( sceneLighting, true, true );
 
         modelCanvas = rvFactory .createJ3dComponent( "" ); // name not relevant there
         imageCaptureViewer = rvFactory.createRenderingViewer( mainScene, modelCanvas );
-        mViewPlatform .addViewer( imageCaptureViewer );
+        cameraController .addViewer( imageCaptureViewer );
         monoController = new PickingController( imageCaptureViewer, this );
         
         leftEyeCanvas = rvFactory .createJ3dComponent( "" );
         RenderingViewer viewer = rvFactory .createRenderingViewer( mainScene, leftEyeCanvas );
-        mViewPlatform .addViewer( viewer );
+        cameraController .addViewer( viewer );
         viewer .setEye( RenderingViewer .LEFT_EYE );
         leftController = new PickingController( viewer, this );
 
         rightEyeCanvas = rvFactory .createJ3dComponent( "" );
         viewer = rvFactory .createRenderingViewer( mainScene, rightEyeCanvas );
-        mViewPlatform .addViewer( viewer );
+        cameraController .addViewer( viewer );
         viewer .setEye( RenderingViewer .RIGHT_EYE );
         rightController = new PickingController( viewer, this );
         
@@ -295,9 +302,9 @@ public class DocumentController extends DefaultController implements J3dComponen
         showStrutScales = "true" .equals( app.getProperty( "showStrutScales" ) );
 
         AlgebraicField field = this .documentModel .getField();
-        previewStrut = new PreviewStrut( field, mainScene, mViewPlatform );
+        previewStrut = new PreviewStrut( field, mainScene, cameraController );
         
-        lessonController = new LessonController( this .documentModel .getLesson(), mViewPlatform );
+        lessonController = new LessonController( this .documentModel .getLesson(), cameraController );
         lessonController .setNextController( this );
 
         setSymmetrySystem( this .documentModel .getSymmetrySystem() );
@@ -355,7 +362,7 @@ public class DocumentController extends DefaultController implements J3dComponen
             if ( canvas == modelCanvas )
                 lessonPageClick = mouseTool; // will not be attached, initially; gets attached on switchToArticle
 
-            mouseTool = new MouseToolFilter( mViewPlatform .getZoomScroller() )
+            mouseTool = new MouseToolFilter( cameraController .getZoomScroller() )
             {
                 public void mouseWheelMoved( MouseWheelEvent e )
                 {
@@ -376,7 +383,7 @@ public class DocumentController extends DefaultController implements J3dComponen
             };
             mouseTool .attach( canvas );
 
-            mouseTool = mViewPlatform .getTrackball();
+            mouseTool = cameraController .getTrackball();
             if ( propertyIsTrue( "presenter.mode" ) )
                 ((Trackball) mouseTool) .setModal( false );
 //            if ( ! editingModel )
@@ -507,13 +514,13 @@ public class DocumentController extends DefaultController implements J3dComponen
             // mRenderedModel .setFactory( mViewer .getSceneGraphFactory() );
             // mRenderedModel .setTopGroup( mViewer .getSceneGraphRoot() );
 
-            mViewPlatform .updateViewers();
+            cameraController .updateViewers();
 //            currentDesign .render( true, null );   // I think this is not necessary now
             return canvas;
         }
         else if ( name.equals( "controlViewer" ) )
         {
-            MouseTool trackball = mViewPlatform .getTrackball();
+            MouseTool trackball = cameraController .getTrackball();
             RenderingViewer.Factory rvFactory = mApp .getJ3dFactory();
             Component canvas = rvFactory .createJ3dComponent( name ); // name not relevant there
    
@@ -523,13 +530,13 @@ public class DocumentController extends DefaultController implements J3dComponen
             canvas .addMouseMotionListener( trackball );
 
             RenderingViewer viewer = rvFactory .createRenderingViewer( mControlBallScene, canvas );
-            mViewPlatform .addViewer( new TrackballRenderingViewer( viewer ) );
+            cameraController .addViewer( new TrackballRenderingViewer( viewer ) );
 
             // mControlBallScene .reset();
         	for ( RenderedManifestation rm : mControlBallModel )
                 mControlBallScene.manifestationAdded( rm );
 
-            mViewPlatform .updateViewers();
+            cameraController .updateViewers();
             return canvas;
         }
         else
@@ -560,7 +567,7 @@ public class DocumentController extends DefaultController implements J3dComponen
         	for ( RenderedManifestation rm : mControlBallModel )
                 mControlBallScene.manifestationAdded( rm );
         }
-        mViewPlatform .setSnapper( symmetryController.getSnapper() );
+        cameraController .setSnapper( symmetryController.getSnapper() );
         properties().firePropertyChange( "symmetry", null, name ); // notify UI, so cardpanel can flip, or whatever
         setRenderingStyle();
     }
@@ -595,28 +602,9 @@ public class DocumentController extends DefaultController implements J3dComponen
         
         mErrors .clearError();
         try {
-            if ( action.equals( "undo" ) )
-                this .documentModel .undo();
-            else if ( action.equals( "redo" ) )
-            	this .documentModel .redo();
-            else if ( action.equals( "undoToBreakpoint" ) ) {
-            	this .documentModel .undoToBreakpoint();
-            } else if ( action.equals( "redoToBreakpoint" ) ) {
-            	this .documentModel .redoToBreakpoint();
-            } 
-            else if ( action.equals( "setBreakpoint" ) )
-            	this .documentModel .setBreakpoint();
-            else if ( action.equals( "undoAll" ) ) {
-            	this .documentModel .undoAll();
-            } else if ( action.equals( "redoAll" ) ) {
-            	this .documentModel .redoAll( - 1 );
-            } else if ( action.startsWith( "redoUntilEdit." ) ) {
-                String editNum = action .substring( "redoUntilEdit.".length() );
-                this .documentModel .redoAll( Integer.parseInt( editNum ) );
-            }
-            else if ( action .equals( "switchToArticle" ) )
+            if ( action .equals( "switchToArticle" ) )
             {
-                currentView = mViewPlatform .getView();
+                currentView = cameraController .getView();
                 
                 selectionClick .detach( modelCanvas );
                 previewStrutStart .detach( modelCanvas );
@@ -638,7 +626,7 @@ public class DocumentController extends DefaultController implements J3dComponen
             {
                 documentModel .removePropertyChangeListener( this .articleChanges );
                 documentModel .addPropertyChangeListener( this .modelChanges );
-                mViewPlatform .restoreView( currentView );
+                cameraController .restoreView( currentView );
 
                 RenderedModel .renderChange( currentSnapshot, mRenderedModel, mainScene );
                 currentSnapshot = mRenderedModel;
@@ -657,7 +645,7 @@ public class DocumentController extends DefaultController implements J3dComponen
             }
             else if ( action .equals( "takeSnapshot" ) )
             {
-            	documentModel .addSnapshotPage( mViewPlatform .getView() );
+            	documentModel .addSnapshotPage( cameraController .getView() );
             }
 
             else if ( "nextPage" .equals( action ) )
@@ -680,7 +668,7 @@ public class DocumentController extends DefaultController implements J3dComponen
             
             else if ( action.equals( "refresh.2d" ) )
             {
-                Java2dExporter exporter = new Java2dExporter( mViewPlatform.getView(), this.mApp.getColors(), this.sceneLighting, this.currentSnapshot );
+                Java2dExporter exporter = new Java2dExporter( cameraController.getView(), this.mApp.getColors(), this.sceneLighting, this.currentSnapshot );
                 this .mSnapshot .setExporter( exporter );
             }
 
@@ -730,19 +718,19 @@ public class DocumentController extends DefaultController implements J3dComponen
 
             else if ( action.equals( "copyThisView" ) )
             {
-                mViewPlatform .copyView( mViewPlatform .getView() );
+                cameraController .copyView( cameraController .getView() );
             }
             else if ( action.equals( "useCopiedView" ) )
             {
-                mViewPlatform .useCopiedView();
+                cameraController .useCopiedView();
             }
             else if ( action.equals( "lookAtOrigin" ) )
-                mViewPlatform.setLookAtPoint( new Point3d( 0, 0, 0 ) );
+                cameraController.setLookAtPoint( new Point3d( 0, 0, 0 ) );
             
             else if ( action.equals( "lookAtSymmetryCenter" ) )
             {
             	RealVector loc = documentModel .getParamLocation( "ball" );
-            	mViewPlatform .setLookAtPoint( new Point3d( loc.x, loc.y, loc.z ) );
+            	cameraController .setLookAtPoint( new Point3d( loc.x, loc.y, loc.z ) );
             }
 
             else if ( action .equals( "usedOrbits" ) )
@@ -921,7 +909,7 @@ public class DocumentController extends DefaultController implements J3dComponen
         		String js = readResource( "org/vorthmann/zome/app/j360-loop.js" );
         		writeFile( js, new File( dir, "j360-loop.js" ) );
 
-            	AnimationCaptureController animation = new AnimationCaptureController( this .mViewPlatform, dir );
+            	AnimationCaptureController animation = new AnimationCaptureController( this .cameraController, dir );
             	captureImageFile( null, AnimationCaptureController.TYPE, animation );
                 return;
             }
@@ -943,7 +931,7 @@ public class DocumentController extends DefaultController implements J3dComponen
         		Dimension size = this .modelCanvas .getSize();        		
             	try {
                     String format = command .substring( "export." .length() );
-                    Exporter3d exporter = documentModel .getNaiveExporter( format, mViewPlatform .getView(), colors, sceneLighting, currentSnapshot );
+                    Exporter3d exporter = documentModel .getNaiveExporter( format, cameraController .getView(), colors, sceneLighting, currentSnapshot );
                     if ( exporter != null ) {
                         exporter.doExport( file, file.getParentFile(), out, size.height, size.width );
                     }
@@ -951,7 +939,7 @@ public class DocumentController extends DefaultController implements J3dComponen
                         exporter = this .mApp .getExporter( format );
                         if ( exporter == null ) {
                         	// currently just "partgeom"
-                        	exporter = documentModel .getStructuredExporter( format, mViewPlatform .getView(), colors, sceneLighting, mRenderedModel );
+                        	exporter = documentModel .getStructuredExporter( format, cameraController .getView(), colors, sceneLighting, mRenderedModel );
                         }
                     	if ( exporter != null )
                     		exporter .doExport( documentModel, file, file.getParentFile(), out, size.height, size.width );
@@ -1092,7 +1080,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 				break;
 
 			case "useCopiedView":
-            	result[ i ] = mViewPlatform .hasCopiedView();
+            	result[ i ] = cameraController .hasCopiedView();
 				break;
 
 			default:
@@ -1112,9 +1100,9 @@ public class DocumentController extends DefaultController implements J3dComponen
     public void setErrorChannel( ErrorChannel errors )
     {
         mErrors = errors;
-        if ( mViewPlatform == null )
+        if ( cameraController == null )
             return;
-        mViewPlatform.setErrorChannel( errors );
+        cameraController.setErrorChannel( errors );
         lessonController.setErrorChannel( errors );
         toolsController .setErrorChannel( errors );
     }
@@ -1215,7 +1203,8 @@ public class DocumentController extends DefaultController implements J3dComponen
 			return rightController;
 
 	    case "viewPlatform":
-            return mViewPlatform;
+	    case "camera":
+            return cameraController;
 
 	    case "symmetry":
             return symmetryController;
@@ -1226,6 +1215,9 @@ public class DocumentController extends DefaultController implements J3dComponen
 	    case "parts":
             return partsController; 
         
+	    case "undoRedo":
+            return undoRedoController; 
+        
 	    case "polytopes":
             return polytopesController; 
         
@@ -1234,7 +1226,7 @@ public class DocumentController extends DefaultController implements J3dComponen
         
 	    case "snapshot.2d": {
             if ( mSnapshot == null ) {
-                Java2dExporter exporter = new Java2dExporter( mViewPlatform.getView(), this.mApp.getColors(), this.sceneLighting, this.currentSnapshot );
+                Java2dExporter exporter = new Java2dExporter( cameraController.getView(), this.mApp.getColors(), this.sceneLighting, this.currentSnapshot );
                 mSnapshot = new Java2dSnapshot( exporter );
                 mSnapshot .setNextController( this );
             }
@@ -1342,7 +1334,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 
             case "lookAtBall":
             	RealVector loc = documentModel .getLocation( singleConstruction );
-            	mViewPlatform .setLookAtPoint( new Point3d( loc.x, loc.y, loc.z ) );
+            	cameraController .setLookAtPoint( new Point3d( loc.x, loc.y, loc.z ) );
                 break;
                 
             case "setBuildOrbitAndLength": {

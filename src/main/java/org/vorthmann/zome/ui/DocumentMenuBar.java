@@ -36,12 +36,15 @@ public class DocumentMenuBar extends JMenuBar implements PropertyChangeListener
 	
 	private final boolean fullPower;
 
+	private final Controller controller;
+	
 	public DocumentMenuBar( final Controller controller, ControlActions actions )
 	{
 		this .actions = actions;
+		this .controller = controller;
 
 		controller .addPropertyListener( this );
-
+		
         String initSystem = controller .getProperty( "symmetry" );
 
         String fieldName = controller .getProperty( "field.name" );
@@ -182,17 +185,17 @@ public class DocumentMenuBar extends JMenuBar implements PropertyChangeListener
         // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Edit menu
 
         menu = new JMenu( "Edit" );
-        menu.add( enableIf( isEditor, createMenuItem( "Undo", "undo", KeyEvent.VK_Z, COMMAND ) ) );
-        menu.add( enableIf( isEditor, createMenuItem( "Redo", ( "redo" ), KeyEvent.VK_Y, COMMAND ) ) );
-        menu.add( enableIf( isEditor, createMenuItem( "Undo All", ( "undoAll" ), KeyEvent.VK_Z, COMMAND_OPTION ) ) );
-        menu.add( enableIf( isEditor, createMenuItem( "Redo All", ( "redoAll" ), KeyEvent.VK_Y, COMMAND_OPTION ) ) );
+        menu .add( withAccelerator( KeyEvent.VK_Z, COMMAND, withAction( "undoRedo", "undo",  new JMenuItem( "Undo" ) ) ) );
+        menu .add( withAccelerator( KeyEvent.VK_Y, COMMAND, withAction( "undoRedo", "redo",  new JMenuItem( "Redo" ) ) ) );
+        menu .add( withAccelerator( KeyEvent.VK_Z, COMMAND_OPTION, withAction( "undoRedo", "undoAll",  new JMenuItem( "Undo All" ) ) ) );
+        menu .add( withAccelerator( KeyEvent.VK_Y, COMMAND_OPTION, withAction( "undoRedo", "redoAll",  new JMenuItem( "Redo All" ) ) ) );
         if ( developerExtras )
         {
             menu .addSeparator(); // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            menu .add( createMenuItem( "Undo To Breakpoint", ( "undoToBreakpoint" ), KeyEvent.VK_B, COMMAND_SHIFT ) );
-            menu .add( createMenuItem( "Redo To Breakpoint", ( "redoToBreakpoint" ), KeyEvent.VK_B, COMMAND_OPTION ) );
-            menu .add( createMenuItem( "Set Breakpoint", ( "setBreakpoint" ), KeyEvent.VK_B, COMMAND ) );
-            menu .add( createMenuItem( "Redo to Edit Number...", "redoUntilEdit" ) );
+            menu .add( withAccelerator( KeyEvent.VK_B, COMMAND_SHIFT, withAction( "undoRedo", "undoToBreakpoint", new JMenuItem( "Undo To Breakpoint" ) ) ) );
+            menu .add( withAccelerator( KeyEvent.VK_B, COMMAND_OPTION, withAction( "undoRedo", "redoToBreakpoint", new JMenuItem( "Redo To Breakpoint" ) ) ) );
+            menu .add( withAccelerator( KeyEvent.VK_B, COMMAND, withAction( "undoRedo", "setBreakpoint", new JMenuItem( "Set Breakpoint" ) ) ) );
+            menu .add( withAction( "undoRedo", "redoUntilEdit", new JMenuItem( "Redo to Edit Number..." ) ) );
         }
         menu .addSeparator(); // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         menu .add( enableIf( isEditor, createMenuItem( "Copy", ( "copy" ), KeyEvent.VK_C, COMMAND ) ) );
@@ -510,6 +513,32 @@ public class DocumentMenuBar extends JMenuBar implements PropertyChangeListener
 	{
     	control .setEnabled( enable );
     	return control;
+	}
+
+	private JMenuItem withAction( String action, JMenuItem menuItem )
+	{
+		return withAction( null, action, menuItem );
+	}
+
+	private JMenuItem withAction( String controllerName, String action, JMenuItem menuItem )
+	{
+		menuItem .setActionCommand( action );
+		Controller subc = this .controller;
+		if ( controllerName != null )
+			subc = subc .getSubController( controllerName );
+		if ( subc != null ) {
+			menuItem .setEnabled( true );
+			menuItem .addActionListener( subc );
+		}
+		else
+			menuItem .setEnabled( false );
+    	return menuItem;
+	}
+
+	private JMenuItem withAccelerator( int key, int modifiers, JMenuItem menuItem )
+	{
+        menuItem .setAccelerator( KeyStroke.getKeyStroke( key, modifiers ) );
+    	return menuItem;
 	}
 	
     private JMenuItem createMenuItem( String label, String command )
