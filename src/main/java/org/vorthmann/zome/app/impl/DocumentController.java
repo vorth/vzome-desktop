@@ -62,7 +62,6 @@ import com.vzome.core.construction.Polygon;
 import com.vzome.core.construction.Segment;
 import com.vzome.core.editor.DocumentModel;
 import com.vzome.core.editor.SymmetrySystem;
-import com.vzome.core.editor.Tool;
 import com.vzome.core.exporters.Exporter3d;
 import com.vzome.core.math.Polyhedron;
 import com.vzome.core.math.RealVector;
@@ -144,18 +143,12 @@ public class DocumentController extends DefaultController implements J3dComponen
     
     /* subcontrollers */
     
-    private final UndoRedoController undoRedoController;
-
+    private final Map<String,Controller> subcontrollers = new HashMap<String, Controller>();
+    
     private final LessonController lessonController;
 
     private final CameraController cameraController;
-
-    private final ToolsController toolsController;
     
-    private final PartsController partsController;
-
-    private final Controller polytopesController;
-
 	private final PickingController monoController, leftController, rightController;
     
 	private SymmetryController symmetryController;
@@ -190,15 +183,6 @@ public class DocumentController extends DefaultController implements J3dComponen
         startReader = ! newDocument && ! asTemplate;
         
         editingModel = userHasEntitlement( "model.edit" ) && ! propertyIsTrue( "reader.preview" );
-        
-        toolsController = new ToolsController();
-        toolsController .setNextController( this );
-        
-        polytopesController = new PolytopesController( this .documentModel );
-        polytopesController .setNextController( this );
-        
-        undoRedoController = new UndoRedoController( document ); // TODO undoRedo model
-        undoRedoController .setNextController( this );
         
         mRenderedModel = new RenderedModel( this .documentModel .getField(), true );
         currentSnapshot = mRenderedModel;
@@ -310,15 +294,8 @@ public class DocumentController extends DefaultController implements J3dComponen
         setSymmetrySystem( this .documentModel .getSymmetrySystem() );
 
         // can't do this before the setSymmetrySystem() call just above
-        if ( mRenderedModel != null )
-        {
-        	this .documentModel .setRenderedModel( mRenderedModel );
-        	this .currentSnapshot = mRenderedModel;  // Not too sure if this is necessary
-        }
-
-        partsController = new PartsController( symmetryController .getOrbitSource() );
-        partsController .setNextController( this );
-        mRenderedModel .addListener( partsController );
+        this .documentModel .setRenderedModel( mRenderedModel );
+        this .currentSnapshot = mRenderedModel;  // Not too sure if this is necessary
     }
 
     public Component createJ3dComponent( String name )
@@ -575,11 +552,7 @@ public class DocumentController extends DefaultController implements J3dComponen
     private void setRenderingStyle()
     {
         if ( mRenderedModel != null ) {
-            if ( partsController != null )
-                partsController .startSwitch( symmetryController .getOrbitSource() );
             mRenderedModel .setOrbitSource( symmetryController .getOrbitSource() );
-            if ( partsController != null )
-                partsController .endSwitch();
         }
         if ( previewStrut != null )
             previewStrut .setSymmetryController( symmetryController );
@@ -748,23 +721,6 @@ public class DocumentController extends DefaultController implements J3dComponen
             		symmetryController .availableController .doAction( "enableDirection." + orbit .getName(), null );
             	}
             }
-            else if ( action.startsWith( "newTool/" ) )
-            {
-                String name = action .substring( "newTool/" .length() );
-                int nextDot = name .indexOf( "." );
-                String group = name .substring( 0, nextDot );
-                
-                Symmetry symmetry = symmetryController.getSymmetry();
-                if ( "icosahedral" .equals( group ) || "octahedral" .equals( group ) )
-                    symmetry = ((SymmetryController) symmetries .get( group )) .getSymmetry();
-                
-                documentModel .createTool( name, group, toolsController, symmetry );
-            }
-            else if ( action.equals( "applyTool" ) )
-            {
-    	        ToolEvent event = (ToolEvent) e;
-    	        documentModel .applyTool( event .getTool(), toolsController, event .getModes() );
-            }
             
 // This was an experiment, to see if the applyQuaternionSymmetry() approach was workable.
 //  It seems it is too restrictive to insist upon all W=0 inputs.
@@ -837,9 +793,9 @@ public class DocumentController extends DefaultController implements J3dComponen
                 // get the thumbnails updating in the background
                 if ( lessonController != null )
                     lessonController .renderThumbnails( documentModel, thumbnails );
-                if ( this .toolsController != null )
-                    for ( Tool tool : this .documentModel .getTools() )
-                        this .toolsController .addTool( tool );
+//                if ( this .toolsController != null )
+//                    for ( Tool tool : this .documentModel .getTools() )
+//                        this .toolsController .addTool( tool );
             }
             else
                 try {
@@ -1104,7 +1060,6 @@ public class DocumentController extends DefaultController implements J3dComponen
             return;
         cameraController.setErrorChannel( errors );
         lessonController.setErrorChannel( errors );
-        toolsController .setErrorChannel( errors );
     }
 
 	@Override
@@ -1208,18 +1163,6 @@ public class DocumentController extends DefaultController implements J3dComponen
 
 	    case "symmetry":
             return symmetryController;
-
-	    case "tools":
-            return toolsController;
-        
-	    case "parts":
-            return partsController; 
-        
-	    case "undoRedo":
-            return undoRedoController; 
-        
-	    case "polytopes":
-            return polytopesController; 
         
 	    case "lesson":
             return lessonController;
@@ -1237,7 +1180,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 	        if ( name.startsWith( "symmetry." ) )
 	            return (SymmetryController) this.symmetries.get( name.substring( "symmetry.".length() ) );
 	        else
-	        	return null;
+	        	return this .subcontrollers .get( name );
 		}
     }
 
@@ -1395,5 +1338,10 @@ public class DocumentController extends DefaultController implements J3dComponen
 		default:
 	 		return this .getProperty( propName );
 		}
+	}
+	
+	public void addSubController( String name, Controller sub )
+	{
+		this .subcontrollers .put( name, sub );
 	}
 }

@@ -249,8 +249,7 @@ public class ApplicationController extends DefaultController
 		        		DocumentModel document = modelApp .createDocument( fieldName );
 		        		String title = "Untitled " + ++lastUntitled;
 		        		docProps .setProperty( "window.title", title );
-		        		DocumentController newest = new DocumentController( document, this, docProps );
-		        		newDocumentController( title, newest );
+		        		addDocumentController( title, document, docProps );
 		            }
 		        }
 		        else if ( action .startsWith( "openResource-" ) )
@@ -325,8 +324,7 @@ public class ApplicationController extends DefaultController
 	private void loadDocumentController( final String name, final InputStream bytes, final Properties properties ) throws Exception
 	{
 		DocumentModel document = modelApp .loadDocument( bytes );
-		DocumentController newest = new DocumentController( document, ApplicationController.this, properties );
-		newDocumentController( name, newest );
+		addDocumentController( name, document, properties );
 	}
 
     RenderingViewer.Factory getJ3dFactory()
@@ -376,10 +374,29 @@ public class ApplicationController extends DefaultController
     	return docControllers .get( name );
     }
 
-    private void newDocumentController( final String name, final DocumentController newest )
+    private void addDocumentController( final String name, final DocumentModel model, final Properties props )
     {
-        this .docControllers .put( name, newest );
-        newest .addPropertyListener( new PropertyChangeListener()
+		DocumentController docController = new DocumentController( model, this, props );
+
+		PartsController partsController = new PartsController();
+        model .getRenderedModel() .addListener( partsController );
+        docController .addSubController( "parts", partsController );
+
+        Controller polytopesController = new PolytopesController( model );
+        polytopesController .setNextController( this );
+        docController .addSubController( "polytopes", polytopesController );
+
+        Controller undoRedoController = new UndoRedoController( model ); // TODO undoRedo model
+        undoRedoController .setNextController( docController );
+        docController .addSubController( "undoRedo", undoRedoController );
+
+        ToolsController toolsController = new ToolsController( model .getTools(), model .getField(), model .getSymmetrySystem() .getSymmetry() );
+        toolsController .setNextController( docController ); // TODO use the symmetry so we don't need this
+        docController .addPropertyListener( toolsController ); // listen for symmetry changes
+        docController .addSubController( "tools", toolsController );
+
+        this .docControllers .put( name, docController );
+        docController .addPropertyListener( new PropertyChangeListener()
         {
 			@Override
 			public void propertyChange( PropertyChangeEvent evt )
@@ -388,7 +405,7 @@ public class ApplicationController extends DefaultController
 
 				case "name":
 			        docControllers .remove( name );
-			        docControllers .put( (String) evt .getNewValue(), newest );
+			        docControllers .put( (String) evt .getNewValue(), docController );
 					break;
 
 				case "visible":
@@ -406,7 +423,7 @@ public class ApplicationController extends DefaultController
 			}
 		});
         // trigger window creation in the UI
-		this .properties() .firePropertyChange( "newDocument", null, newest );
+		this .properties() .firePropertyChange( "newDocument", null, docController );
     }
 
     private RenderedModel loadModelPanels( String path )

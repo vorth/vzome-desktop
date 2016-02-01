@@ -449,9 +449,6 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                         JPanel toolsPanel = new ToolsPanel( DocumentFrame.this, toolsController );
                         tabbedPane .addTab( "tools", toolsPanel );
                         
-                        JPanel bomPanel = new PartsPanel( mController .getSubController( "parts" ) );
-                        tabbedPane .addTab( "parts", bomPanel );
-                        
                         modelArticleEditPanel .add( tabbedPane, "model" );
                     }
                     else
@@ -836,5 +833,12 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 	public void makeUnnamed()
 	{
 		this .mFile = null;
+	}
+
+	public int addRightTab( String title, JPanel panel )
+	{
+		int next = this .tabbedPane .getTabCount();
+        this .tabbedPane .addTab( title, panel );
+        return next;
 	}
 }

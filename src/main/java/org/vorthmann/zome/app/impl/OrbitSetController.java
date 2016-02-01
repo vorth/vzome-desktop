@@ -32,7 +32,7 @@ import com.vzome.core.math.symmetry.OctahedralSymmetry;
 import com.vzome.core.math.symmetry.OrbitSet;
 import com.vzome.core.math.symmetry.Symmetry;
 import com.vzome.core.render.Color;
-import com.vzome.core.render.RenderedModel.OrbitSource;
+import com.vzome.core.render.OrbitSource;
 
 public class OrbitSetController extends DefaultController implements PropertyChangeListener
 {

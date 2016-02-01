@@ -11,30 +11,12 @@ import com.vzome.core.math.symmetry.Direction;
 import com.vzome.core.model.Connector;
 import com.vzome.core.model.Manifestation;
 import com.vzome.core.render.Color;
+import com.vzome.core.render.OrbitSource;
 import com.vzome.core.render.RenderedManifestation;
-import com.vzome.core.render.RenderedModel.OrbitSource;
 import com.vzome.core.render.RenderingChanges;
 
 public class PartsController extends DefaultController implements RenderingChanges
-{
-    private OrbitSource oldOrbits, newOrbits;
-    
-    public PartsController( OrbitSource orbits )
-    {
-        this .oldOrbits = orbits;
-        this .newOrbits = orbits;
-    }
-    
-    public void startSwitch( OrbitSource switchTo )
-    {
-        this .newOrbits = switchTo;
-    }
-    
-    public void endSwitch()
-    {
-        this .oldOrbits = this .newOrbits;
-    }
-
+{    
     private String getStrutData( Polyhedron poly, AlgebraicNumber length, OrbitSource orbits )
     {
         Direction orbit = poly .getOrbit();
@@ -55,7 +37,7 @@ public class PartsController extends DefaultController implements RenderingChang
             return;
         AlgebraicNumber length = poly .getLength();
         if ( length != null )
-            properties() .firePropertyChange( "addStrut-" + getStrutData( poly, length, newOrbits ), null, poly );
+            properties() .firePropertyChange( "addStrut-" + getStrutData( poly, length, rendered .getOrbitSource() ), null, poly );
         else if ( m instanceof Connector )
             properties() .firePropertyChange( "addBall", null, null );
     }
@@ -73,7 +55,7 @@ public class PartsController extends DefaultController implements RenderingChang
                 // now emit prop changes for the BOM table panel
                 AlgebraicNumber length = poly .getLength();
                 if ( length != null )
-                    properties() .firePropertyChange( "removeStrut-" + getStrutData( poly, length, oldOrbits ), null, poly );
+                    properties() .firePropertyChange( "removeStrut-" + getStrutData( poly, length, rendered .getOrbitSource() ), null, poly );
             }
         }
     }
@@ -101,5 +83,4 @@ public class PartsController extends DefaultController implements RenderingChang
 
     public void disableFrameLabels()
     {}
-
 }

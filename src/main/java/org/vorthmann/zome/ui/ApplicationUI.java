@@ -265,22 +265,31 @@ public final class ApplicationUI implements ActionListener, PropertyChangeListen
 
 		case "newDocument":
 			Controller controller = (Controller) evt. getNewValue();
-			DocumentFrame window = new DocumentFrame( controller );
-	        window .setVisible( true );
-	        window .setAppUI( new PropertyChangeListener() {
-				
-				@Override
-				public void propertyChange( PropertyChangeEvent evt )
-				{
-					windowsToClose .remove( window );
-				}
-			} );
-	        windowsToClose .add( window );
+			createWindow( controller );
 			break;
 
 		default:
 			break;
 		}
+	}
+	
+	private void createWindow( Controller controller )
+	{
+		DocumentFrame window = new DocumentFrame( controller );
+		
+		Controller partsList = controller .getSubController( "parts" );
+		window .addRightTab( "parts", new PartsPanel( partsList ) );
+					
+        window .setVisible( true );
+        window .setAppUI( new PropertyChangeListener() {
+			
+			@Override
+			public void propertyChange( PropertyChangeEvent evt )
+			{
+				windowsToClose .remove( window );
+			}
+		} );
+        windowsToClose .add( window );
 	}
 
 	@Override

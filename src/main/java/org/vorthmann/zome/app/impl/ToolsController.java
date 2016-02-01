@@ -4,46 +4,51 @@
 package org.vorthmann.zome.app.impl;
 
 import java.awt.event.ActionEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.vorthmann.ui.DefaultController;
 
-import com.vzome.core.commands.Command;
+import com.vzome.core.algebra.AlgebraicField;
 import com.vzome.core.editor.Tool;
-import com.vzome.core.editor.TransformationTool;
+import com.vzome.core.editor.Tools;
+import com.vzome.core.math.symmetry.Symmetry;
 
-public class ToolsController extends DefaultController implements Tool.Registry
+public class ToolsController extends DefaultController implements PropertyChangeListener
 {
-    public void doAction( String action, ActionEvent e ) throws Exception
+    private final Tools model;
+
+	private Symmetry symmetry;
+
+	private final AlgebraicField field;
+
+	public ToolsController( Tools model, AlgebraicField field, Symmetry symmetry )
+    {
+		super();
+		this .model = model;
+		this.field = field;
+		this .symmetry = symmetry;
+		
+		model .addPropertyListener( this );
+	}
+
+	public void doAction( String action, ActionEvent e ) throws Exception
     {
     	// TODO first-class support for modes in ToolEvent
     	
         int modifiers = e .getModifiers();
-        if ( action .startsWith( "menu-last-tool/" ) )
-        {
-            action = action .substring( "menu-" .length() );
-            modifiers = ActionEvent .SHIFT_MASK;
-        }
-        
-        if ( action .startsWith( "last-tool/" ) )
-        {
-            String category = action .substring( "last-tool/" .length() );
-            Tool tool = (Tool) categories .get( category );
-            if ( tool == null )
-            {
-                super .doAction( "newTool/default." + category + ".auto/" + TransformationTool.DEFAULT_NAME_TRIGGER, e );
-                tool = (Tool) categories .get( category );
-            }
-            if ( tool == null )
-                throw new Command.Failure( "No tool in the category \"" + category + "\" has been applied yet, or the last-used was removed." );
-            super .doAction( "applyTool", new ToolEvent( tool, modifiers, this, e ) );
-        }
-        else if ( toolNames .contains( action ) )
+        if ( toolNames .contains( action ) )
         {
             Tool tool = getTool( action );
-            super .doAction( "applyTool", new ToolEvent( tool, modifiers, this, e ) );
+	        this .model .applyTool( tool, modifiers );
+        }
+        else if ( action .startsWith( "newTool/" ) )
+        {
+            String name = action .substring( "newTool/" .length() );
+            int nextDot = name .indexOf( "." );
+            String group = name .substring( 0, nextDot );
+            this .model .createTool( name, group, symmetry );
         }
         else
             super .doAction( action, e );
@@ -58,42 +63,31 @@ public class ToolsController extends DefaultController implements Tool.Registry
     }
 
     private final ArrayList toolNames = new ArrayList();
-    
-    private final Map tools = new HashMap();
-    
-    private final Map categories = new HashMap();
-        
-    public void addTool( Tool tool )
-    {
-        String name = tool .getName();
-        tools .put( name, tool );
-        toolNames .add( name );
-        useTool( tool );
-        properties() .firePropertyChange( "tool.instances", null, name );
-    }
-
-    public void removeTool( Tool tool )
-    {
-        String name = tool .getName();
-        tools .remove( name );
-        toolNames .remove( name );
-        categories .remove( tool .getCategory() );
-        properties() .firePropertyChange( "tool.instances", name, null );
-    }
-
+            
     public Tool getTool( String toolName )
     {
-        return (Tool) tools .get( toolName );
+        return (Tool) model .get( toolName );
     }
 
-    public void useTool( Tool tool )
-    {
-        String category = tool .getCategory();
-        categories .put( category, tool );
-    }
+	@Override
+	public void propertyChange( PropertyChangeEvent evt )
+	{
+		switch ( evt .getPropertyName() ) {
 
-    public Tool getLastInCategory( String category )
-    {
-        return (Tool) categories .get( category );
-    }
+		case "symmetry":
+			String name = (String) evt .getNewValue();
+			this .symmetry = this .field .getSymmetry( name );
+			break;
+
+		case "tool.instances":
+			name = (String) evt .getNewValue();
+            toolNames .add( name );
+			// forward from the model to the UI
+            properties() .firePropertyChange( "tool.instances", null, name );
+			break;
+
+		default:
+			break;
+		}
+	}
 }
