@@ -24,7 +24,7 @@ import com.vzome.core.render.OrbitSource;
 import com.vzome.core.render.Shapes;
 import com.vzome.desktop.controller.CameraController;
 
-public class SymmetryController extends DefaultController// implements RenderedModel.OrbitSource
+public class SymmetryController extends DefaultController
 {
     public String getProperty( String string )
     {
@@ -46,13 +46,11 @@ public class SymmetryController extends DefaultController// implements RenderedM
     public OrbitSet availableOrbits;
     public OrbitSet snapOrbits;
     public OrbitSet buildOrbits;
-    public OrbitSet renderOrbits;
     private final CameraController.Snapper snapper;
     
     public OrbitSetController availableController;
     public OrbitSetController snapController;
     public OrbitSetController buildController;
-    public OrbitSetController renderController;
     
     public Map orbitLengths = new HashMap();
         
@@ -74,7 +72,6 @@ public class SymmetryController extends DefaultController// implements RenderedM
         availableOrbits = new OrbitSet( symmetry );
         snapOrbits = new OrbitSet( symmetry );
         buildOrbits = new OrbitSet( symmetry );
-        renderOrbits = new OrbitSet( symmetry );
         snapper = new SymmetrySnapper( snapOrbits );
         boolean haveLoneBuildOrbit = false;
         for ( Iterator dirs = symmetry .getOrbitSet() .iterator(); dirs .hasNext(); )
@@ -90,7 +87,6 @@ public class SymmetryController extends DefaultController// implements RenderedM
                     haveLoneBuildOrbit = true;
                 }
             }
-            renderOrbits .add( dir );
             orbitLengths .put( dir, new LengthController( dir ) );
         }
         availableController = new OrbitSetController( availableOrbits, this .symmetrySystem .getOrbits(), this .symmetrySystem, false );
@@ -99,8 +95,6 @@ public class SymmetryController extends DefaultController// implements RenderedM
         snapController .setNextController( this );
         buildController = new OrbitSetController( buildOrbits, availableOrbits, this .symmetrySystem, true );
         buildController .setNextController( this );
-        renderController = new OrbitSetController( renderOrbits, this .symmetrySystem .getOrbits(), this .symmetrySystem, false );
-        renderController .setNextController( this );
 
         for ( Iterator dirs = this .symmetrySystem .getOrbits() .iterator(); dirs .hasNext(); )
         {
@@ -133,8 +127,6 @@ public class SymmetryController extends DefaultController// implements RenderedM
             return snapController;
         if ( name .equals( "buildOrbits" ) )
             return buildController;
-        if ( name .equals( "renderOrbits" ) )
-            return renderController;
         if ( name .startsWith( "length." ) )
         {
             String dirName = name .substring( "length." .length() );
@@ -189,7 +181,6 @@ public class SymmetryController extends DefaultController// implements RenderedM
         	result = new LengthController( dir );
         	result .setNextController( buildController );
             orbitLengths .put( dir, result );
-            renderOrbits .add( dir );
             availableOrbits .add( dir );
         }
         return result;

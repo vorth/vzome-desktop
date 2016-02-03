@@ -2,6 +2,8 @@ package org.vorthmann.zome.app.impl;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.vorthmann.ui.Controller;
 import org.vorthmann.ui.DefaultController;
@@ -25,11 +27,13 @@ import com.vzome.desktop.controller.RenderingViewer;
 public class PickingController extends DefaultController implements Controller
 {
 	private final RenderingViewer viewer;
-	private final DocumentController delegate;
+	private final Controller delegate;
 	
 	private transient Manifestation pickedManifestation;
+	
+	private final List<PickingTool> tools = new ArrayList<PickingTool>();
 
-	public PickingController( RenderingViewer viewer, DocumentController delegate )
+	public PickingController( RenderingViewer viewer, Controller delegate )
 	{
 		this.viewer = viewer;
 		this.delegate = delegate;
@@ -38,14 +42,18 @@ public class PickingController extends DefaultController implements Controller
 	@Override
 	public void doAction( String action, ActionEvent e ) throws Exception
 	{
+		for ( PickingTool pickingTool : tools ) {
+			if ( pickingTool .doManifestationAction( this .pickedManifestation, action) ) {
+				this .pickedManifestation = null;
+				return;
+			}
+		}
         switch ( action ) {
 
         case "undoToManifestation":
         case "symmTool-icosahedral":
         case "setSymmetryCenter":
         case "setSymmetryAxis":
-        case "setWorkingPlaneAxis":
-        case "setWorkingPlane":
         case "lookAtBall":
         case "setBuildOrbitAndLength":
         case "selectSimilarSize":
@@ -56,7 +64,6 @@ public class PickingController extends DefaultController implements Controller
 			this .delegate .doAction( action, e );
 		}
 
-		this .pickedManifestation = null;
 	}
 
 	@Override
@@ -68,7 +75,12 @@ public class PickingController extends DefaultController implements Controller
         	pickedManifestation = rm.getManifestation();
 
         boolean[] result = this .delegate .enableContextualCommands( menu, e );
-        for ( int i = 0; i < menu.length; i++ ) {
+
+		for ( PickingTool pickingTool : tools ) {
+			result = pickingTool .enableCommands( this .pickedManifestation, menu, result );
+		}
+
+		for ( int i = 0; i < menu.length; i++ ) {
             String menuItem = menu[i];
             switch ( menuItem ) {
 
@@ -83,13 +95,10 @@ public class PickingController extends DefaultController implements Controller
 				break;
 
 			case "setSymmetryAxis":
-			case "setWorkingPlaneAxis":
 			case "selectSimilarSize":
-			case "setBuildOrbitAndLength":
             	result[ i ] = pickedManifestation instanceof Strut;
 				break;
 
-			case "setWorkingPlane":
 			case "showPanelVertices":
             	result[ i ] = pickedManifestation instanceof Panel;
 				break;

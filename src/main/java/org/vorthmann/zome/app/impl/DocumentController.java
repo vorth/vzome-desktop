@@ -93,10 +93,6 @@ public class DocumentController extends DefaultController implements J3dComponen
 {
     private DocumentModel documentModel;
     
-    public boolean useGraphicalViews = false, showStrutScales = false;
-
-    private final PreviewStrut previewStrut;
-
     private final RenderedModel mRenderedModel;
 
     private RenderedModel currentSnapshot;
@@ -113,7 +109,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 
     private final ApplicationController mApp;
 
-    private boolean mRequireShift = false, showFrameLabels = false, useWorkingPlane = false;
+    private boolean mRequireShift = false, showFrameLabels = false;
 
     private final boolean startReader;
     
@@ -123,8 +119,6 @@ public class DocumentController extends DefaultController implements J3dComponen
 
     private final Properties properties;
     
-    private Segment workingPlaneAxis = null;
-
     private Map<String,SymmetryController> symmetries = new HashMap<>();
 
     private String designClipboard;
@@ -139,7 +133,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 
     private final Component modelCanvas, leftEyeCanvas, rightEyeCanvas;
 
-    private MouseTool selectionClick, previewStrutStart, previewStrutRoll, previewStrutPlanarDrag;
+    private MouseTool selectionClick;
     
     /* subcontrollers */
     
@@ -282,11 +276,6 @@ public class DocumentController extends DefaultController implements J3dComponen
         mApp = app;
 
         mRequireShift = "true".equals( app.getProperty( "multiselect.with.shift" ) );
-        useGraphicalViews = "true".equals( app.getProperty( "useGraphicalViews" ) );
-        showStrutScales = "true" .equals( app.getProperty( "showStrutScales" ) );
-
-        AlgebraicField field = this .documentModel .getField();
-        previewStrut = new PreviewStrut( field, mainScene, cameraController );
         
         lessonController = new LessonController( this .documentModel .getLesson(), cameraController );
         lessonController .setNextController( this );
@@ -338,27 +327,6 @@ public class DocumentController extends DefaultController implements J3dComponen
             };
             if ( canvas == modelCanvas )
                 lessonPageClick = mouseTool; // will not be attached, initially; gets attached on switchToArticle
-
-            mouseTool = new MouseToolFilter( cameraController .getZoomScroller() )
-            {
-                public void mouseWheelMoved( MouseWheelEvent e )
-                {
-                    LengthController length = previewStrut .getLengthModel();
-                    if ( length != null )
-                    {
-                        // scroll to scale the preview strut (when it is rendered)
-                        length .getMouseTool() .mouseWheelMoved( e );
-                        // don't adjustPreviewStrut() here, let the prop change trigger it,
-                        // so we don't flicker for every tick of the mousewheel
-                    }
-                    else
-                    {
-                        // no strut build in progress, so zoom the view
-                        super .mouseWheelMoved( e );
-                    }
-                }
-            };
-            mouseTool .attach( canvas );
 
             mouseTool = cameraController .getTrackball();
             if ( propertyIsTrue( "presenter.mode" ) )
@@ -431,68 +399,10 @@ public class DocumentController extends DefaultController implements J3dComponen
             if ( canvas == modelCanvas )
                 selectionClick = mouseTool;
 
-            // drag events to render or realize the preview strut;
-            //   only works when drag starts over a ball
-            mouseTool = new LeftMouseDragAdapter( new ManifestationPicker( imageCaptureViewer )
-            {                
-                protected void dragStarted( Manifestation target, boolean b )
-                {
-                    if ( target instanceof Connector )
-                    {
-                        mErrors .clearError();
-                        Point point = (Point) ((Connector) target) .getConstructions() .next();
-                        AlgebraicVector workingPlaneNormal = null;
-                        if ( useWorkingPlane && (workingPlaneAxis != null ) )
-                        	workingPlaneNormal = workingPlaneAxis .getOffset();
-                        previewStrut .startRendering( symmetryController, point, workingPlaneNormal );
-                    }
-                }
-
-				protected void dragFinished( Manifestation target, boolean b )
-                {
-                    previewStrut .finishPreview( documentModel );
-                }
-            } );
-            if ( editingModel )
-                mouseTool .attach( canvas );
-            if ( canvas == modelCanvas )
-                previewStrutStart = mouseTool;
-
-            // trackball to adjust the preview strut (when it is rendered)
-            mouseTool = new LeftMouseDragAdapter( new Trackball()
-            {
-                protected void trackballRolled( Quat4d roll )
-                {
-                    previewStrut .trackballRolled( roll );
-                }
-            } );
-            if ( editingModel )
-                mouseTool .attach( canvas );
-            if ( canvas == modelCanvas )
-                previewStrutRoll = mouseTool;
-            
-            // working plane drag events to adjust the preview strut (when it is rendered)
-            mouseTool = new LeftMouseDragAdapter( new MouseToolDefault()
-            {
-				@Override
-				public void mouseDragged( MouseEvent e )
-				{
-					Point3d imagePt = new Point3d();
-					Point3d eyePt = new Point3d();
-					imageCaptureViewer .pickPoint( e, imagePt, eyePt );
-					previewStrut .workingPlaneDrag( imagePt, eyePt );
-				}
-            } );
-            if ( editingModel )
-                mouseTool .attach( canvas );
-            if ( canvas == modelCanvas )
-                previewStrutPlanarDrag = mouseTool;
-            
             // mRenderedModel .setFactory( mViewer .getSceneGraphFactory() );
             // mRenderedModel .setTopGroup( mViewer .getSceneGraphRoot() );
 
             cameraController .updateViewers();
-//            currentDesign .render( true, null );   // I think this is not necessary now
             return canvas;
         }
         else if ( name.equals( "controlViewer" ) )
@@ -580,9 +490,7 @@ public class DocumentController extends DefaultController implements J3dComponen
                 currentView = cameraController .getView();
                 
                 selectionClick .detach( modelCanvas );
-                previewStrutStart .detach( modelCanvas );
-                previewStrutRoll .detach( modelCanvas );
-                previewStrutPlanarDrag .detach( modelCanvas );
+                strutBuildTool .detach( modelCanvas );
                 modelModeMainTrackball .detach( modelCanvas );
                 
                 lessonPageClick .attach( modelCanvas );
@@ -608,9 +516,7 @@ public class DocumentController extends DefaultController implements J3dComponen
                 articleModeMainTrackball .detach( modelCanvas );
                 
                 selectionClick .attach( modelCanvas );
-                previewStrutStart .attach( modelCanvas );
-                previewStrutRoll .attach( modelCanvas );
-                previewStrutPlanarDrag .attach( modelCanvas );
+                strutBuildTool .attach( modelCanvas );
                 modelModeMainTrackball .attach( modelCanvas );
 
                 this .editingModel = true;
@@ -660,27 +566,6 @@ public class DocumentController extends DefaultController implements J3dComponen
             else if ( action.equals( "toggleOutlines" ) )
             {
                 ((Java3dSceneGraph) mainScene ) .togglePolygonOutlinesMode();
-            }
-
-            else if ( action.equals( "toggleWorkingPlane" ) )
-            {
-                useWorkingPlane = ! useWorkingPlane;
-//                if ( useWorkingPlane )
-//                    mainScene .enableWorkingPlane( workingPlaneOrbits );
-//                else
-//                    mainScene .disableWorkingPlane( workingPlaneOrbits );
-            }
-
-            else if ( action.equals( "toggleOrbitViews" ) ) {
-                boolean old = useGraphicalViews;
-                useGraphicalViews = ! old;
-                properties().firePropertyChange( "useGraphicalViews", old, this.useGraphicalViews );
-            }
-
-            else if ( action.equals( "toggleStrutScales" ) ) {
-                boolean old = showStrutScales;
-                showStrutScales = ! old;
-                properties().firePropertyChange( "showStrutScales", old, this.showStrutScales );
             }
 
             else if ( action.startsWith( "setSymmetry." ) ) {
@@ -1065,12 +950,6 @@ public class DocumentController extends DefaultController implements J3dComponen
 	@Override
     public String getProperty( String string )
     {
-        if ( "useGraphicalViews".equals( string ) ) {
-            return Boolean.toString( this.useGraphicalViews );
-        }
-        if ( "showStrutScales".equals( string ) ) {
-            return Boolean.toString( this.showStrutScales );
-        }
         if ( "startReader".equals( string ) )
             return Boolean.toString( startReader );
 
@@ -1094,12 +973,6 @@ public class DocumentController extends DefaultController implements J3dComponen
                 
         if ( "drawOutlines" .equals( string ) )
             return Boolean .toString( ((Java3dSceneGraph) mainScene) .getPolygonOutlinesMode() );
-                
-        if ( "useWorkingPlane" .equals( string ) )
-            return Boolean .toString( useWorkingPlane );
-                
-        if ( "workingPlaneDefined" .equals( string ) )
-            return Boolean .toString( workingPlaneAxis != null );
                 
         if ( string .startsWith( "tool.description." ) )
         {
@@ -1187,11 +1060,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 	@Override
     public void setProperty( String cmd, Object value )
     {
-        if ( "useGraphicalViews".equals( cmd ) ) {
-            this.useGraphicalViews = "true".equals( value );
-            properties().firePropertyChange( cmd, false, this.useGraphicalViews );
-            return;
-        } else if ( "visible".equals( cmd ) ) {
+        if ( "visible".equals( cmd ) ) {
         	// Window is listening, will bring itself to the front, or close itself
         	// App controller will set topDocument, or remove the document.
         	properties() .firePropertyChange( "visible", null, value );
@@ -1202,10 +1071,6 @@ public class DocumentController extends DefaultController implements J3dComponen
             sceneLighting .setProperty( cmd, value );
         } else if ( "terminating".equals( cmd ) ) {
             properties().firePropertyChange( cmd, null, value );
-        } else if ( "showStrutScales".equals( cmd ) ) {
-            boolean old = showStrutScales;
-            this.showStrutScales = "true" .equals( value );
-            properties().firePropertyChange( "showStrutScales", old, this.showStrutScales );
         }
         else if ( "clipboard" .equals( cmd ) )
             this .designClipboard = (String) value;
@@ -1265,32 +1130,10 @@ public class DocumentController extends DefaultController implements J3dComponen
                 this .documentModel .setParameter( singleConstruction, "strut" );
     			break;
 
-            case "setWorkingPlaneAxis":
-            	this .workingPlaneAxis = (Segment) singleConstruction;
-            	this .properties() .firePropertyChange( "workingPlaneDefined", false, true );
-    			break;
-
-            case "setWorkingPlane":
-            	this .workingPlaneAxis = this .documentModel .getPlaneAxis( (Polygon) singleConstruction );
-            	this .properties() .firePropertyChange( "workingPlaneDefined", false, true );
-    			break;
-
             case "lookAtBall":
             	RealVector loc = documentModel .getLocation( singleConstruction );
             	cameraController .setLookAtPoint( new Point3d( loc.x, loc.y, loc.z ) );
                 break;
-                
-            case "setBuildOrbitAndLength": {
-                AlgebraicVector offset = ((Strut) pickedManifestation) .getOffset();
-                Axis zone = symmetryController .getZone( offset );
-                Direction orbit = zone .getOrbit();
-                AlgebraicNumber length = zone .getLength( offset );
-    			symmetryController .availableController .doAction( "enableDirection." + orbit .getName(), null );
-    	        symmetryController .buildController .doAction( "setSingleDirection." + orbit .getName(), null );
-    	        LengthController lmodel = (LengthController) symmetryController .buildController .getSubController( "currentLength" );
-    	        lmodel .setActualLength( length );
-            	}
-            	break;
                 
             case "selectSimilarSize": {
                 Strut strut = (Strut) pickedManifestation;
