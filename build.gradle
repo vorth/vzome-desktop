@@ -44,6 +44,8 @@ ext.jvmArgs = [
     "com.apple.macos.use-file-dialog-packages": "true",
     "com.apple.macos.useScreenMenuBar": "true",
     "com.apple.smallTabs": "true",
+    "sun.java2d.opengl": "true",
+    "swing.volatileImageBufferEnabled": "false",
     "java.util.logging.config.file": "logging.properties" ]
 ext.vzomeArgs = [  // a list, not a map
     '-entitlement.model.edit', 'true', '-entitlement.lesson.edit', 'true', '-entitlement.all.tools', 'true',
