@@ -40,9 +40,9 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingWorker;
 import javax.swing.ToolTipManager;
 
-import org.vorthmann.j3d.J3dComponentFactory;
 import org.vorthmann.j3d.Platform;
 import org.vorthmann.ui.Controller;
 import org.vorthmann.ui.DefaultController;
@@ -56,7 +56,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 
     protected final Controller mController, toolsController;
 
-    private final ModelPanel modelPanel;
+    private ModelPanel modelPanel;
             
     private final JTabbedPane tabbedPane = new JTabbedPane();
     
@@ -399,10 +399,10 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 
         // Now the component containment hierarchy
         
+        final JPanel leftCenterPanel = new JPanel( new BorderLayout() );
         JPanel outerPanel = new JPanel( new BorderLayout() );
         setContentPane( outerPanel );
         {
-            JPanel leftCenterPanel = new JPanel( new BorderLayout() );
             {
                 if ( this .isEditor )
                 {
@@ -459,8 +459,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                     leftCenterPanel .add(  modeAndStatusPanel, BorderLayout.PAGE_START );
                 }
 
-                modelPanel = new ModelPanel( mController, this, this .isEditor, fullPower );
-                leftCenterPanel .add( modelPanel, BorderLayout.CENTER );
+                leftCenterPanel .add( new JPanel(), BorderLayout.CENTER );
             }
             outerPanel.add( leftCenterPanel, BorderLayout.CENTER );
 
@@ -473,8 +472,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 
             JPanel rightPanel = new JPanel( new BorderLayout() );
             {
-                Component trackballCanvas = ( (J3dComponentFactory) mController ) .createJ3dComponent( "controlViewer" );
-                viewControl = new ViewPlatformControlPanel( trackballCanvas, viewPlatform );
+                viewControl = new ViewPlatformControlPanel( viewPlatform, null );
                 // this is probably moot for reader mode
                 rightPanel .add( viewControl, BorderLayout.PAGE_START );
                 
@@ -590,80 +588,101 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
         this.setVisible( true );
         this.setFocusable( true );
 
-
-        new ExclusiveAction( this .getExcluder() )
+        new SwingWorker<Object, Object>()
         {
 			@Override
-            protected void doAction( ActionEvent e ) throws Exception
-            {
-		        System .out .println( "Starting finish.load" );
-				mController .doAction( "finish.load", e );
-                
-                String title = mController .getProperty( "window.title" );
-                boolean migrated = mController .propertyIsTrue( "migrated" );
-                
-                boolean asTemplate = mController .propertyIsTrue( "as.template" );
-                URL url = null; // TODO
-
-                if ( ! mController .userHasEntitlement( "model.edit" ) )
-                {
-                	mController .doAction( "switchToArticle", e );
-                    if ( url != null )
-                        title = url .toExternalForm();
-                    migrated = false;
-                }
-
-                if ( ! asTemplate && migrated ) { // a migration
-                    final String NL = System .getProperty( "line.separator" );
-                    if ( mController .propertyIsTrue( "autoFormatConversion" ) )
-                    {
-                        if ( mController .propertyIsTrue( "formatIsSupported" ) )
-                            JOptionPane .showMessageDialog( DocumentFrame.this,
-                                    "This document was created by an older version." + NL + 
-                                    "If you save it now, it will be converted automatically" + NL +
-                                    "to the current format.  It will no longer open using" + NL +
-                                    "the older version.",
-                                    "Automatic Conversion", JOptionPane.INFORMATION_MESSAGE );
-                        else
-                        {
-                            title = null;
-                            DocumentFrame.this .makeUnnamed();
-                            JOptionPane .showMessageDialog( DocumentFrame.this,
-                                    "You have \"autoFormatConversion\" turned on," + NL + 
-                                    "but the behavior is disabled until this version of vZome" + NL +
-                                    "is stable.  This converted document is being opened as" + NL +
-                                    "a new document.",
-                                    "Automatic Conversion Disabled", JOptionPane.INFORMATION_MESSAGE );
-                        }
-                    }
-                    else
-                    {
-                        title = null;
-                        DocumentFrame.this .makeUnnamed();
-                        JOptionPane .showMessageDialog( DocumentFrame.this,
-                                "This document was created by an older version." + NL + 
-                                "It is being opened as a new document, so you can" + NL +
-                                "still open the original using the older version.",
-                                "Outdated Format", JOptionPane.INFORMATION_MESSAGE );
-                    }
-                }
-
-                if ( title == null )
-                    title = mController .getProperty( "untitled.title" );
-                
-                DocumentFrame.this .setTitle( title );
-            }
-
+			protected Object doInBackground() throws Exception
+			{
+				mController .doAction( "finish.init", null );
+				return null;
+			}
+			
 			@Override
-            protected void showError( Exception e )
-            {
-                JOptionPane .showMessageDialog( DocumentFrame.this,
-                        e .getLocalizedMessage(),
-                        "Error Loading Document", JOptionPane.ERROR_MESSAGE );
-                DocumentFrame.this .dispose();
-            }
-            
-        } .actionPerformed( null );
+			protected void done()
+			{
+				super .done();
+				
+				// back on the EDT, now finish the UI
+                modelPanel = new ModelPanel( mController, DocumentFrame.this, isEditor, fullPower );
+                leftCenterPanel .add( modelPanel, BorderLayout.CENTER );
+
+                // now, schedule more background work, to finish the document load.
+                //   TODO: consider refactoring to merge this worker with the one we just finished.
+		        new ExclusiveAction( getExcluder() )
+		        {
+					@Override
+		            protected void doAction( ActionEvent e ) throws Exception
+		            {
+				        System .out .println( "Starting finish.load" );
+						mController .doAction( "finish.load", e );
+		                
+		                String title = mController .getProperty( "window.title" );
+		                boolean migrated = mController .propertyIsTrue( "migrated" );
+		                
+		                boolean asTemplate = mController .propertyIsTrue( "as.template" );
+		                URL url = null; // TODO
+
+		                if ( ! mController .userHasEntitlement( "model.edit" ) )
+		                {
+		                	mController .doAction( "switchToArticle", e );
+		                    if ( url != null )
+		                        title = url .toExternalForm();
+		                    migrated = false;
+		                }
+
+		                if ( ! asTemplate && migrated ) { // a migration
+		                    final String NL = System .getProperty( "line.separator" );
+		                    if ( mController .propertyIsTrue( "autoFormatConversion" ) )
+		                    {
+		                        if ( mController .propertyIsTrue( "formatIsSupported" ) )
+		                            JOptionPane .showMessageDialog( DocumentFrame.this,
+		                                    "This document was created by an older version." + NL + 
+		                                    "If you save it now, it will be converted automatically" + NL +
+		                                    "to the current format.  It will no longer open using" + NL +
+		                                    "the older version.",
+		                                    "Automatic Conversion", JOptionPane.INFORMATION_MESSAGE );
+		                        else
+		                        {
+		                            title = null;
+		                            DocumentFrame.this .makeUnnamed();
+		                            JOptionPane .showMessageDialog( DocumentFrame.this,
+		                                    "You have \"autoFormatConversion\" turned on," + NL + 
+		                                    "but the behavior is disabled until this version of vZome" + NL +
+		                                    "is stable.  This converted document is being opened as" + NL +
+		                                    "a new document.",
+		                                    "Automatic Conversion Disabled", JOptionPane.INFORMATION_MESSAGE );
+		                        }
+		                    }
+		                    else
+		                    {
+		                        title = null;
+		                        DocumentFrame.this .makeUnnamed();
+		                        JOptionPane .showMessageDialog( DocumentFrame.this,
+		                                "This document was created by an older version." + NL + 
+		                                "It is being opened as a new document, so you can" + NL +
+		                                "still open the original using the older version.",
+		                                "Outdated Format", JOptionPane.INFORMATION_MESSAGE );
+		                    }
+		                }
+
+		                if ( title == null )
+		                    title = mController .getProperty( "untitled.title" );
+		                
+		                DocumentFrame.this .setTitle( title );
+		            }
+
+					@Override
+		            protected void showError( Exception e )
+		            {
+		                JOptionPane .showMessageDialog( DocumentFrame.this,
+		                        e .getLocalizedMessage(),
+		                        "Error Loading Document", JOptionPane.ERROR_MESSAGE );
+		                DocumentFrame.this .dispose();
+		            }
+		            
+		        } .actionPerformed( null );
+			}
+		} .execute();
     }
 
     private ExclusiveAction getExclusiveAction( final String action )

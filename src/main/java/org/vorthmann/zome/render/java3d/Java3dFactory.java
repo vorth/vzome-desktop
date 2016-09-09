@@ -255,7 +255,7 @@ public class Java3dFactory implements RenderingViewer.Factory, J3dComponentFacto
     }
 
     @Override
-    public Component createJ3dComponent( String name )
+    public Component createJ3dComponent()
     {
         GraphicsConfigTemplate3D gct = new GraphicsConfigTemplate3D();
         gct .setSceneAntialiasing( GraphicsConfigTemplate3D .REQUIRED );
