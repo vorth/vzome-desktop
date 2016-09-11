@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,6 +41,7 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingWorker;
 import javax.swing.ToolTipManager;
 
 import org.vorthmann.j3d.J3dComponentFactory;
@@ -172,7 +174,6 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                     statusText .setText( "" );
             }
         };
-        mController .setErrorChannel( errors );
 
         // ---- catch-all ActionListener for locally-handled actions
 
@@ -393,15 +394,11 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 
         // -------------------------------------- create panels and tools
 
-        viewPlatform = mController .getSubController( "viewPlatform" );
-        lessonController = mController .getSubController( "lesson" );
-        lessonController .addPropertyListener( this );
-
         // Now the component containment hierarchy
         
         JPanel outerPanel = new JPanel( new BorderLayout() );
         setContentPane( outerPanel );
-        {
+        
             JPanel leftCenterPanel = new JPanel( new BorderLayout() );
             {
                 if ( this .isEditor )
@@ -441,7 +438,6 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                         }
                     } );
                     articleButton  = new JRadioButton( "Article" );
-                    articleButton .setEnabled( lessonController .propertyIsTrue( "has.pages" ) );
                     articleButton .setSelected( false );
                     articleButtonsPanel .add( articleButton );
                     group .add( articleButton );
@@ -473,10 +469,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
 
             JPanel rightPanel = new JPanel( new BorderLayout() );
             {
-                Component trackballCanvas = ( (J3dComponentFactory) mController ) .createJ3dComponent( "controlViewer" );
-                viewControl = new ViewPlatformControlPanel( trackballCanvas, viewPlatform );
-                // this is probably moot for reader mode
-                rightPanel .add( viewControl, BorderLayout.PAGE_START );
+                rightPanel .add( new JPanel(), BorderLayout.PAGE_START ); // a placeholder, until the controller is fully realized
                 
                 modelArticleEditPanel = new JPanel();
                 modelArticleCardLayout = new CardLayout();
@@ -492,9 +485,6 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                         	ToolsPanel toolsPanel = new ToolsPanel( DocumentFrame.this, toolsController );
                             tabbedPane .addTab( "tools", toolsPanel );
                         }
-                        
-                        JPanel bomPanel = new PartsPanel( mController .getSubController( "parts" ) );
-                        tabbedPane .addTab( "parts", bomPanel );
                         
                         modelArticleEditPanel .add( tabbedPane, "model" );
                     }
@@ -518,7 +508,7 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
                 rightPanel .add( modelArticleEditPanel, BorderLayout.CENTER );
             }
             outerPanel.add( rightPanel, BorderLayout.LINE_END );
-        }
+        
 
         JPopupMenu.setDefaultLightWeightPopupEnabled( false );
         ToolTipManager ttm = ToolTipManager.sharedInstance();
@@ -589,7 +579,6 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
         System .out .println( "setVisible" );
         this.setVisible( true );
         this.setFocusable( true );
-
 
         new ExclusiveAction( this .getExcluder() )
         {
@@ -664,6 +653,33 @@ public class DocumentFrame extends JFrame implements PropertyChangeListener, Con
             }
             
         } .actionPerformed( null );
+
+        new SwingWorker<Controller, Object>()
+        {
+			@Override
+			protected Controller doInBackground() throws Exception
+			{
+				return controller .asController();
+			}
+			
+			@Override
+			protected void done()
+			{
+			    controller .setErrorChannel( errors );
+
+		        viewPlatform = mController .getSubController( "viewPlatform" );
+		        lessonController = mController .getSubController( "lesson" );
+		        lessonController .addPropertyListener( DocumentFrame.this );
+		        articleButton .setEnabled( lessonController .propertyIsTrue( "has.pages" ) );
+
+                viewControl = new ViewPlatformControlPanel( viewPlatform, (J3dComponentFactory) controller );
+                // this is probably moot for reader mode
+                rightPanel .add( viewControl, BorderLayout.PAGE_START );
+                
+                JPanel bomPanel = new PartsPanel( mController .getSubController( "parts" ) );
+                tabbedPane .addTab( "parts", bomPanel );
+			}
+		} .execute();
     }
 
     private ExclusiveAction getExclusiveAction( final String action )

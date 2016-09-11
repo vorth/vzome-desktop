@@ -12,6 +12,7 @@ import java.beans.PropertyChangeListener;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.AbstractButton;
 import javax.swing.Icon;
@@ -23,6 +24,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JToolBar;
 import javax.swing.SwingConstants;
+import javax.swing.SwingWorker;
 
 import org.vorthmann.j3d.J3dComponentFactory;
 import org.vorthmann.ui.Controller;
@@ -32,7 +34,7 @@ public class ModelPanel extends JPanel implements PropertyChangeListener
 	private static final String TOOLTIP_PREFIX = "<html><b>";
 	private static final String TOOLTIP_SUFFIX = "</b><br><br><p>Right-click to configure this tool.</p></html>";
 
-	private final Component monocularCanvas; //, leftEyeCanvas, rightEyeCanvas;
+	private Component monocularCanvas; //, leftEyeCanvas, rightEyeCanvas;
     private MouseListener monocularClicks; //, leftEyeClicks, rightEyeClicks;
     private final JToolBar oldToolBar, firstToolbar, secondToolbar, bookmarkBar; // TODO these don't need to be fields
     private final JScrollPane firstScroller, secondScroller, bookmarkScroller;
@@ -41,17 +43,15 @@ public class ModelPanel extends JPanel implements PropertyChangeListener
 	private final JPanel mMonocularPanel;
 	private final ToolConfigDialog toolConfigDialog;
 	private Map<String, AbstractButton> toolCreationButtons = new HashMap<String, AbstractButton>();
+	private final ControlActions enabler;
 
 	public ModelPanel( Controller controller, ControlActions enabler, boolean isEditor, boolean fullPower )
 	{
 		super( new BorderLayout() );
 		this .controller = controller;
+		this.enabler = enabler;
         this .view = controller .getSubController( "viewPlatform" );
         this .isEditor = isEditor;
-        
-        Controller monoController = controller .getSubController( "monocularPicking" );
-//        Controller leftController = controller .getSubController( "leftEyePicking" );
-//        Controller rightController = controller .getSubController( "rightEyePicking" );
         
         controller .addPropertyListener( this );
 
@@ -68,8 +68,6 @@ public class ModelPanel extends JPanel implements PropertyChangeListener
         mMonocularPanel = new JPanel( new BorderLayout() );
         {
             mMonocularPanel .setPreferredSize( new Dimension( 2000, 2000 ) );
-            monocularCanvas = ( (J3dComponentFactory) controller ) .createJ3dComponent( "mainViewer-monocular" );
-            mMonocularPanel .add( monocularCanvas, BorderLayout.CENTER );
         }
         monoStereoPanel .add( mMonocularPanel, "mono" );
 //        JPanel stereoPanel = new JPanel();
@@ -556,13 +554,6 @@ public class ModelPanel extends JPanel implements PropertyChangeListener
             	this .bookmarkBar = null;
             	firstScroller = null; secondScroller = null; bookmarkScroller = null;
             }
-
-            monocularClicks = new ContextualMenuMouseListener( monoController , new PickerContextualMenu( monoController, enabler, "monocular" ) );
-//            leftEyeClicks = new ContextualMenuMouseListener( leftController , new PickerContextualMenu( leftController, enabler, "leftEye" ) );
-//            rightEyeClicks = new ContextualMenuMouseListener( rightController , new PickerContextualMenu( rightController, enabler, "rightEye" ) );
-            monocularCanvas .addMouseListener( monocularClicks );
-//            leftEyeCanvas .addMouseListener( leftEyeClicks );
-//            rightEyeCanvas .addMouseListener( rightEyeClicks );
         }
         else {
         	this .oldToolBar = null;
@@ -571,6 +562,43 @@ public class ModelPanel extends JPanel implements PropertyChangeListener
         	this .bookmarkBar = null;
         	firstScroller = null; secondScroller = null; bookmarkScroller = null;
         }
+
+        new SwingWorker<Controller, Object>()
+        {
+			@Override
+			protected Controller doInBackground() throws Exception
+			{
+				return controller .asController();
+			}
+			
+			@Override
+			protected void done()
+			{
+				try {
+					setController( get() );
+				} catch ( InterruptedException | ExecutionException e ) {
+					e.printStackTrace();
+				}
+				super.done();
+			}
+		} .execute();
+	}
+	
+	private void setController( Controller controller )
+	{
+        Controller monoController = controller .getSubController( "monocularPicking" );
+//        Controller leftController = controller .getSubController( "leftEyePicking" );
+//        Controller rightController = controller .getSubController( "rightEyePicking" );
+
+        monocularCanvas = ( (J3dComponentFactory) controller ) .createJ3dComponent( "mainViewer-monocular" );
+        mMonocularPanel .add( monocularCanvas, BorderLayout.CENTER );
+
+        monocularClicks = new ContextualMenuMouseListener( monoController , new PickerContextualMenu( monoController, enabler, "monocular" ) );
+//        leftEyeClicks = new ContextualMenuMouseListener( leftController , new PickerContextualMenu( leftController, enabler, "leftEye" ) );
+//        rightEyeClicks = new ContextualMenuMouseListener( rightController , new PickerContextualMenu( rightController, enabler, "rightEye" ) );
+        monocularCanvas .addMouseListener( monocularClicks );
+//        leftEyeCanvas .addMouseListener( leftEyeClicks );
+//        rightEyeCanvas .addMouseListener( rightEyeClicks );
 	}
 	
 	private void addTool( Controller controller )

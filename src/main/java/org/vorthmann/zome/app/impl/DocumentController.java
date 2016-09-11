@@ -95,7 +95,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 {
     private DocumentModel documentModel;
     
-    private final PreviewStrut previewStrut;
+    private PreviewStrut previewStrut;
 
     private final RenderedModel mRenderedModel;
 
@@ -112,7 +112,7 @@ public class DocumentController extends DefaultController implements J3dComponen
     private RenderedModel mControlBallModel;
 
     private RenderingChanges mainScene;
-    private final RenderingChanges mControlBallScene;
+    private RenderingChanges mControlBallScene;
 
     private final ApplicationController mApp;
 
@@ -125,7 +125,7 @@ public class DocumentController extends DefaultController implements J3dComponen
     private boolean showFrameLabels = false;
     private boolean useWorkingPlane = false;
 
-    private final LessonController lessonController;
+    private LessonController lessonController;
 
     private final boolean startReader;
     
@@ -139,9 +139,9 @@ public class DocumentController extends DefaultController implements J3dComponen
     
     private Segment workingPlaneAxis = null;
     
-    private final ToolsController toolsController;
+    private ToolsController toolsController;
     
-    private final PartsController partsController;
+    private PartsController partsController;
 
     private Map<String,SymmetryController> symmetries = new HashMap<>();
 
@@ -154,15 +154,15 @@ public class DocumentController extends DefaultController implements J3dComponen
 
     private MouseTool lessonPageClick, articleModeMainTrackball, modelModeMainTrackball;
 
-    private final Component modelCanvas; //, leftEyeCanvas, rightEyeCanvas;
+    private Component modelCanvas; //, leftEyeCanvas, rightEyeCanvas;
 
     private MouseTool selectionClick, previewStrutStart, previewStrutRoll, previewStrutPlanarDrag;
 
-    private final Controller polytopesController;
+    private Controller polytopesController;
 
     private int changeCount = 0;
 
-    private final PickingController monoController; //, leftController, rightController;
+    private PickingController monoController; //, leftController, rightController;
         
    /*
      * See the javadoc to control the logging:
@@ -178,6 +178,8 @@ public class DocumentController extends DefaultController implements J3dComponen
     public DocumentController( DocumentModel document, ApplicationController app, Properties props )
     {
         setNextController( app );
+
+        mApp = app;
 
         this .properties = props;
         this .documentModel = document;
@@ -298,78 +300,6 @@ public class DocumentController extends DefaultController implements J3dComponen
         useGraphicalViews = "true".equals( app.getProperty( "useGraphicalViews" ) );
         showStrutScales = "true" .equals( app.getProperty( "showStrutScales" ) );
         showFrameLabels = "true" .equals( app.getProperty( "showFrameLabels" ) );
-
-        System.out.println( "mainScene" );
-        
-        RenderingViewer.Factory rvFactory = app .getJ3dFactory();
-        mainScene = rvFactory .createRenderingChanges( sceneLighting, true, this );
-        this .addPropertyListener( (PropertyChangeListener) mainScene );
-
-        System.out.println( "modelCanvas" );
-        
-        modelCanvas = rvFactory .createJ3dComponent( "" ); // name not relevant there
-        imageCaptureViewer = rvFactory.createRenderingViewer( mainScene, modelCanvas );
-        mViewPlatform .addViewer( imageCaptureViewer );
-        monoController = new PickingController( imageCaptureViewer, this );
-        
-//        System.out.println( "leftEyeCanvas" );
-//        
-//        leftEyeCanvas = rvFactory .createJ3dComponent( "" );
-//        RenderingViewer viewer = rvFactory .createRenderingViewer( mainScene, leftEyeCanvas );
-//        mViewPlatform .addViewer( viewer );
-//        viewer .setEye( RenderingViewer .LEFT_EYE );
-//        leftController = new PickingController( viewer, this );
-//
-//        System.out.println( "rightEyeCanvas" );
-//        
-//        rightEyeCanvas = rvFactory .createJ3dComponent( "" );
-//        viewer = rvFactory .createRenderingViewer( mainScene, rightEyeCanvas );
-//        mViewPlatform .addViewer( viewer );
-//        viewer .setEye( RenderingViewer .RIGHT_EYE );
-//        rightController = new PickingController( viewer, this );
-
-            // TODO define a standalone controller class for contextual menus, etc.
-        Controller controlBallProps = new DefaultController()
-        {
-            @Override
-            public String getProperty( String name )
-            {
-                switch ( name ) {
-
-                case "drawOutlines":
-                    return "false";
-
-                case "showIcosahedralLabels":
-                    if ( super .userHasEntitlement( "developer.extras" )
-                            && documentModel.getSymmetrySystem().getSymmetry() instanceof IcosahedralSymmetry ) {
-                        return super.getProperty( "trackball.showIcosahedralLabels" );
-                    } else
-                        return "false";
-
-                default:
-                    return super.getProperty( name );
-                }
-            }
-        };
-        controlBallProps .setNextController( this );
-        System.out.println( "mControlBallScene" );
-        
-        mControlBallScene = rvFactory .createRenderingChanges( sceneLighting, true, controlBallProps );
-
-        System.out.println( "ThumbnailRendererImpl" );
-        
-        thumbnails = new ThumbnailRendererImpl( rvFactory, sceneLighting );
-
-        mApp = app;
-
-        AlgebraicField field = this .documentModel .getField();
-        previewStrut = new PreviewStrut( field, mainScene, mViewPlatform );
-        
-        System.out.println( "LessonController" );
-        
-        lessonController = new LessonController( this .documentModel .getLesson(), mViewPlatform );
-        lessonController .setNextController( this );
-
         System.out.println( "setSymmetrySystem" );
         
         setSymmetrySystem( this .documentModel .getSymmetrySystem() );
@@ -380,6 +310,79 @@ public class DocumentController extends DefaultController implements J3dComponen
             this .documentModel .setRenderedModel( mRenderedModel );
             this .currentSnapshot = mRenderedModel;  // Not too sure if this is necessary
         }
+    }
+    
+    @Override
+    public Controller asController()
+    {
+    	if ( mainScene != null )
+    		return this;
+    	
+    	RenderingViewer.Factory rvFactory = mApp .getJ3dFactory();
+
+        System.out.println( "mainScene" );
+        
+        mainScene = rvFactory .createRenderingChanges( sceneLighting, true, this );
+        this .addPropertyListener( (PropertyChangeListener) mainScene );
+
+        System.out.println( "modelCanvas" );
+        
+        modelCanvas = rvFactory .createJ3dComponent( "" ); // name not relevant there
+        imageCaptureViewer = rvFactory.createRenderingViewer( mainScene, modelCanvas );
+        mViewPlatform .addViewer( imageCaptureViewer );
+        monoController = new PickingController( imageCaptureViewer, this );
+
+        System.out.println( "mControlBallScene" );
+        
+//      leftEyeCanvas = rvFactory .createJ3dComponent( "" );
+//      RenderingViewer viewer = rvFactory .createRenderingViewer( mainScene, leftEyeCanvas );
+//      mViewPlatform .addViewer( viewer );
+//      viewer .setEye( RenderingViewer .LEFT_EYE );
+//      leftController = new PickingController( viewer, this );
+//
+//      rightEyeCanvas = rvFactory .createJ3dComponent( "" );
+//      viewer = rvFactory .createRenderingViewer( mainScene, rightEyeCanvas );
+//      mViewPlatform .addViewer( viewer );
+//      viewer .setEye( RenderingViewer .RIGHT_EYE );
+//      rightController = new PickingController( viewer, this );
+
+          // TODO define a standalone controller class for contextual menus, etc.
+      Controller controlBallProps = new DefaultController()
+      {
+          @Override
+          public String getProperty( String name )
+          {
+              switch ( name ) {
+
+              case "drawOutlines":
+                  return "false";
+
+              case "showIcosahedralLabels":
+                  if ( super .userHasEntitlement( "developer.extras" )
+                          && documentModel.getSymmetrySystem().getSymmetry() instanceof IcosahedralSymmetry ) {
+                      return super.getProperty( "trackball.showIcosahedralLabels" );
+                  } else
+                      return "false";
+
+              default:
+                  return super.getProperty( name );
+              }
+          }
+      };
+      controlBallProps .setNextController( this );
+        mControlBallScene = rvFactory .createRenderingChanges( sceneLighting, true, controlBallProps );
+
+        System.out.println( "ThumbnailRendererImpl" );
+        
+        thumbnails = new ThumbnailRendererImpl( rvFactory, sceneLighting );
+
+        AlgebraicField field = this .documentModel .getField();
+        previewStrut = new PreviewStrut( field, mainScene, mViewPlatform );
+        
+        System.out.println( "LessonController" );
+        
+        lessonController = new LessonController( this .documentModel .getLesson(), mViewPlatform );
+        lessonController .setNextController( this );
 
         System.out.println( "PartsController" );
         
@@ -388,6 +391,8 @@ public class DocumentController extends DefaultController implements J3dComponen
         mRenderedModel .addListener( partsController );
 
         copyThisView(); // initialize the "copied" view at startup.
+
+        return this;
     }
 
     @Override

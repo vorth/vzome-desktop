@@ -15,10 +15,13 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
+import javax.swing.SwingWorker;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import org.vorthmann.j3d.J3dComponentFactory;
 import org.vorthmann.ui.Controller;
+import org.vorthmann.zome.ui.DocumentFrame;
 
 /**
  * Description here.
@@ -60,7 +63,7 @@ public class ViewPlatformControlPanel extends JPanel {
 //    }
     
     
-	public ViewPlatformControlPanel( Component modelPanel, final Controller controller )
+	public ViewPlatformControlPanel( final Controller controller, final J3dComponentFactory factory )
 	{
         this .setBorder( BorderFactory .createTitledBorder( "viewing" ) );
         int nearTicks = magToTicks( MAX_MAG );
@@ -98,7 +101,7 @@ public class ViewPlatformControlPanel extends JPanel {
             add( zslider, BorderLayout .EAST );
 
         trackpad = new JPanel( new BorderLayout() );
-        trackpad .add( modelPanel, BorderLayout.CENTER );
+        trackpad .add( new JPanel(), BorderLayout.CENTER );
         trackpad .setAlignmentX( JLabel .CENTER_ALIGNMENT );
         trackpad .setBorder( BorderFactory .createTitledBorder( "rotation trackball" ) );
         trackpad .setMinimumSize( new Dimension( 100, 100 ) );
@@ -179,6 +182,22 @@ public class ViewPlatformControlPanel extends JPanel {
                     }
                 }
             } );
+
+        new SwingWorker<Controller, Object>()
+        {
+			@Override
+			protected Controller doInBackground() throws Exception
+			{
+				return controller .asController();
+			}
+			
+			@Override
+			protected void done()
+			{
+                Component trackballCanvas = factory .createJ3dComponent( "controlViewer" );
+		        trackpad .add( trackballCanvas, BorderLayout.CENTER );
+			}
+		} .execute();
     }
 
 	protected void switchToMode( String mode )
