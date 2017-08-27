@@ -193,7 +193,7 @@ public class DocumentController extends DefaultController implements J3dComponen
 
         final boolean newDocument = propertyIsTrue( "new.document" );
         
-        drawOutlines = propertyIsTrue( "outline.geometry" );
+        drawOutlines = this .documentModel .getSceneLighting() .isRenderOutlines();
 
         startReader = ! newDocument && ! asTemplate;
         
@@ -283,7 +283,7 @@ public class DocumentController extends DefaultController implements J3dComponen
         else
             this .documentModel .addPropertyChangeListener( this .articleChanges );
 
-        sceneLighting = new Lights( app .getLights() );  // TODO: restore the ability for the document to override
+        sceneLighting = this .documentModel .getSceneLighting();
 
         // this seems backwards, I know... the TrackballViewPlatformModel is the main
         // model, and only forwards two events to trackballVPM

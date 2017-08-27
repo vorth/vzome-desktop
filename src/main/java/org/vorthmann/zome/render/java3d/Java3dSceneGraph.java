@@ -247,14 +247,12 @@ public class Java3dSceneGraph implements RenderingChanges, PropertyChangeListene
 //            axisZLines.setColor( 0, black );
 //        }
 
-        if ( controller .propertyIsTrue( "drawOutlines" ) )
-            propertyChange("drawOutlines", true );
+        propertyChange("drawOutlines", controller .propertyIsTrue( "drawOutlines" ) );
 
         if ( controller .propertyIsTrue( "showFrameLabels" ) )
             propertyChange("showFrameLabels", true );
 
-        if ( controller .propertyIsTrue( "showIcosahedralLabels" ) )
-            propertyChange("showIcosahedralLabels", true );
+        propertyChange("showIcosahedralLabels", controller .propertyIsTrue( "showIcosahedralLabels" ) );
 
         VirtualUniverse vu = new VirtualUniverse();
         mLocale = new Locale( vu );
